@@ -20,11 +20,17 @@ from typing import (
     Iterable,
     Literal,
     Optional,
+    Protocol,
     Tuple,
     Type,
     Union,
 )
 from warnings import warn
+
+try:
+    from sqlcipher3 import dbapi2 as sqlcipher
+except ImportError:
+    from pysqlcipher3 import dbapi2 as sqlcipher
 
 from .context import contextmanager
 from .cursor import Cursor
@@ -35,6 +41,14 @@ LOG = logging.getLogger("aiosqlite")
 
 
 IsolationLevel = Optional[Literal["DEFERRED", "IMMEDIATE", "EXCLUSIVE"]]
+
+
+class DBInterface(Protocol):
+    Connection: sqlite3.Connection
+    def connect(self, path: Union[Path, str], *args, **kwargs) -> sqlite3.Connection:
+        ...
+
+
 
 
 def set_result(fut: asyncio.Future, result: Any) -> None:
@@ -368,6 +382,7 @@ class Connection(Thread):
 
 def connect(
     database: Union[str, Path],
+    module: DBInterface,
     *,
     iter_chunk_size=64,
     loop: Optional[asyncio.AbstractEventLoop] = None,
@@ -389,6 +404,6 @@ def connect(
         else:
             loc = str(database)
 
-        return sqlite3.connect(loc, **kwargs)
+        return module.connect(loc, **kwargs)
 
     return Connection(connector, iter_chunk_size)
